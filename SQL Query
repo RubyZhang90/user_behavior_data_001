@@ -1,0 +1,164 @@
+BEGIN TRANSACTION;
+
+INSERT INTO public.user_behavior_data_001
+(_id, airlineiatacode, componentname, eventcategory, eventaction, label, provider, url, devicecategory, siteedition, 
+deeplinksiteedition, pagetypecode, journeytype, originairportiatacode, destinationairportiatacode, departuredate, returndate, 
+fareclass, passengercount, isflexibledates, discountcode, miles, totalprice, currencycode, totalpriceusd, emcid, referrer, browser, __idgroup, __createdat)
+
+SELECT 
+      _id,
+      UPPER(airline_code)    AS airlineiatacode,
+      event           AS componentName,
+      event_category  AS eventCategory,
+      event_action    AS eventAction,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'label'),''), NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'l'),'')) as label,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'provider'),''), NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'p'),'')) as provider,
+      replace(replace(replace(replace(replace(replace(replace(replace(json_extract_path_text(variables,'url'),'\?',''),'\#',''),'\'',''),'\%3A',':'),'\%2F','/'),'\%3F',''),'\%23',''),'http:','https:')  as url,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'deviceCategory'),''), NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'dct'),'')) as deviceCategory,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'siteEdition'),''), NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'se'),'')) as siteEdition,
+      JSON_EXTRACT_PATH_TEXT(variables, 'dse') as deeplinksiteedition,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'pageTypeCode'),''), NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'ptc'),'')) as pageTypeCode,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'journeyType'),''), NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'jt'),'')) as journeyType,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'route'),''),NULLIF(LEFT(JSON_EXTRACT_PATH_TEXT(variables, 'r'),3),'')) as originairportiatacode,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'route'),''),NULLIF(RIGHT(JSON_EXTRACT_PATH_TEXT(variables, 'r'),3),'')) as destinationairportiatacode,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'date'),''),
+        NULLIF(CASE 
+          WHEN length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1)) >10 
+          THEN 'n/a'
+           
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1) in ('NaNaNaN','YYYY03DD')
+          THEN 'n/a'
+          
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1) ~ '20[0-9]{6}' 
+               and length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1)) = 8 
+          THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'YYYYMMDD',FALSE) AS varchar(2048))
+          
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1) ~ '20[0-9]{5}'
+               and length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1)) = 7
+          THEN regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'^[0-9]{4}') + '-0'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'^[0-9]{1}',5) + '-'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'[0-9]{2}$')
+        
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1) ~ '[0-9]{2}\/[0-9]{2}\/[0-9]{4}'
+          and SPLIT_PART(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'/',1)>12
+          THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'DD/MM/YYYY') AS varchar(2048))
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1) ~ '[0-9]{2}\/[0-9]{2}\/[0-9]{4}'
+          and SPLIT_PART(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'/',1)<=12
+          THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'MM/DD/YYYY') AS varchar(2048))
+        
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1) ~ '[0-9]{2}\/[0-9]{2}\/[0-9]{2}'
+          and SPLIT_PART(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'/',1)>12
+          THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'DD/MM/YY') AS varchar(2048))
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1) ~ '[0-9]{2}\/[0-9]{2}\/[0-9]{2}'
+          and SPLIT_PART(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'/',1)<=12
+          THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'MM/DD/YY') AS varchar(2048))
+              
+          WHEN JSON_EXTRACT_PATH_TEXT(variables, 'dt') ~ '[a-zA-Z]{3} [0-9]{2}, [0-9]{4}'
+          THEN CAST(TO_DATE(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),'Mon DD, YYYY') AS varchar(2048))
+        
+          WHEN length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1)) = 6
+          THEN regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'^[0-9]{4}',3)+ '-0'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'^[0-9]{1}') + '-0'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'^[0-9]{1}',2)
+          
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1) !~ '20[0-9]{5}'
+             and length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1)) = 7
+          THEN regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'^[0-9]{4}',4)+ '-0'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'^[0-9]{1}') + '-'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1),'^[0-9]{2}',2)
+          
+          ELSE SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',1)
+END,'')) as departuredate,
+        
+       coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'date'),''),
+        NULLIF(CASE 
+        WHEN length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2)) >10 
+        THEN 'n/a'
+          
+        WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) in ('NaNaNaN','YYYY03DD')
+        THEN 'n/a'
+          
+        WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) ~ '20[0-9]{6}'
+             and length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2)) = 8 
+        THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'YYYYMMDD',FALSE) AS varchar(2048))
+        
+        WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) ~ '20[0-9]{5}'
+             and length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2)) = 7
+        THEN regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'^[0-9]{4}') + '-0'
+        + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'^[0-9]{1}',5) + '-'
+        + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'[0-9]{2}$')
+        
+        WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) ~ '[0-9]{2}\/[0-9]{2}\/[0-9]{4}'
+        and SPLIT_PART(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'/',1)>12
+          THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'DD/MM/YYYY') AS varchar(2048))
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) ~ '[0-9]{2}\/[0-9]{2}\/[0-9]{4}'
+          and SPLIT_PART(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'/',1)<=12
+        THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'MM/DD/YYYY') AS varchar(2048))
+        
+        WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) ~ '[0-9]{2}\/[0-9]{2}\/[0-9]{2}'
+        and SPLIT_PART(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'/',1)>12
+        THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'DD/MM/YY') AS varchar(2048))
+        WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) ~ '[0-9]{2}\/[0-9]{2}\/[0-9]{2}'
+        and SPLIT_PART(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'/',1)<=12
+        THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'MM/DD/YY') AS varchar(2048))
+        
+        WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) ~ '[a-zA-Z]{3} [0-9]{2}, [0-9]{4}'
+        THEN CAST(TO_DATE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'Mon DD, YYYY') AS varchar(2048))
+        
+        WHEN length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2)) = 6
+          THEN regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'^[0-9]{4}',3)+ '-0'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'^[0-9]{1}') + '-0'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'^[0-9]{1}',2)
+          
+          WHEN SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2) !~ '20[0-9]{5}'
+             and length(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2)) = 7
+          THEN regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'^[0-9]{4}',4)+ '-0'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'^[0-9]{1}') + '-'
+          + regexp_substr(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),'^[0-9]{2}',2)
+          
+          ELSE REPLACE(SPLIT_PART(JSON_EXTRACT_PATH_TEXT(variables, 'dt'),',',2),' ','n/a')
+END,'')) as returndate,
+
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'fareClass'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'fc'),'')) as fareClass,
+      replace(replace(replace(replace(coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'passengerCount'),''),
+      NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'pc'),'')),'0[object Object]',0),'NaN',0),'{{ event.totalPax}}',0),'[object Object]',0) :: integer as passengerCount,
+      case coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'isFlexibleDates'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'fd'),''))  
+           WHEN 'true' THEN TRUE
+           WHEN 'false' THEN FALSE
+           ELSE NULL
+      END :: boolean as isFlexibleDates,
+      CASE
+      WHEN OCTET_LENGTH(coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'discountCode'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'dc'),''))) > 2048
+      THEN 'n/a'
+      ELSE
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'discountCode'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'dc'),'')) 
+      END as discountCode,
+      CASE JSON_EXTRACT_PATH_TEXT(variables, 'm')
+           WHEN 'true' THEN TRUE
+           WHEN 'false' THEN FALSE
+           ELSE NULL
+      END :: boolean as miles,
+      replace(replace(coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'totalPrice'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'tp'),'')), 'n/a',0),'NaN',0) ::DECIMAL(38,2) as totalPrice,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'currency'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'c'),'')) as currencycode,
+      replace(replace(coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'totalPriceUSD'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(variables, 'tpu'),'')), 'n/a',0),'NaN',0) ::DECIMAL(38,2) as totalPriceUSD,
+      JSON_EXTRACT_PATH_TEXT(variables, 'emcid') as emcid,
+      CASE 
+      WHEN SPLIT_PART(coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(context, 'datasource','referrer'),''),
+      NULLIF(JSON_EXTRACT_PATH_TEXT(context,'referrer'),'')), '/',3) is null THEN 'n/a'
+      ELSE  
+      SPLIT_PART(coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(context, 'datasource','referrer'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(context,'referrer'),'')), '/',1)+
+      SPLIT_PART(coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(context, 'datasource','referrer'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(context,'referrer'),'')), '/',2)+ '//'+
+      SPLIT_PART(coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(context, 'datasource','referrer'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(context,'referrer'),'')), '/',3) 
+      END as referrer,
+      coalesce(NULLIF(JSON_EXTRACT_PATH_TEXT(context, 'audience','browser'),''),NULLIF(JSON_EXTRACT_PATH_TEXT(context,'browser'),'')) as browser,
+      _id as __idGroup,
+      __createdat
+FROM public.em_cmp_lib_tracking_001
+WHERE __createdat >= '2022-04-21'::timestamp and __createdat < '2022-04-28'::timestamp
+AND json_extract_path_text(variables, 'url') !~ '\:\/\/[a-z]+-[a-z]+\.'
+AND json_extract_path_text(variables, 'url') !~ '\:\/\/[a-z]+_[a-z]+\.'
+AND json_extract_path_text(variables, 'url') !~ '\:\/\/[a-z]+-[a-z]+-latest\.'
+AND json_extract_path_text(variables, 'url') !~ '.airtrfx.'
+AND json_extract_path_text(variables, 'url') !~ '[^a-z]test'
+;
+COMMIT;
